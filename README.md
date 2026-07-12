@@ -1,4 +1,4 @@
-# @cryptoapis/x402-buyer-sdk
+# @cryptoapis-io/x402-buyer-sdk
 
 A `fetch` wrapper that transparently **pays HTTP 402 responses** with x402: it parses the merchant's
 price, gets the signing payload from the CryptoAPIs buyer service, **signs locally**, and retries — so
@@ -11,13 +11,13 @@ end-to-end (the only enabled chain).
 ## Install
 
 ```bash
-npm install @cryptoapis/x402-buyer-sdk
+npm install @cryptoapis-io/x402-buyer-sdk
 ```
 
 ## Use
 
 ```js
-import { createX402Fetch } from '@cryptoapis/x402-buyer-sdk';
+import { createX402Fetch } from '@cryptoapis-io/x402-buyer-sdk';
 import { Wallet } from 'ethers';
 
 const wallet = new Wallet(process.env.PRIVATE_KEY); // your key — never leaves your process

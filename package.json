@@ -1,12 +1,36 @@
 {
-  "name": "@cryptoapis/x402-buyer-sdk",
+  "name": "@cryptoapis-io/x402-buyer-sdk",
   "version": "0.1.0",
-  "description": "CryptoAPIs x402 buyer SDK — a fetch wrapper that auto-pays HTTP 402 responses (authorize → sign locally → retry). Non-custodial: you provide the signer; keys never enter the SDK.",
+  "description": "CryptoAPIs x402 buyer SDK \u2014 a fetch wrapper that auto-pays HTTP 402 responses (authorize \u2192 sign locally \u2192 retry). Non-custodial: you provide the signer; keys never enter the SDK.",
+  "license": "MIT",
+  "author": "Crypto APIs, Inc.",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/CryptoAPIs-io/cryptoapis-x402-buyer-sdk.git"
+  },
+  "homepage": "https://developers.cryptoapis.io",
+  "keywords": [
+    "x402",
+    "payments",
+    "cryptoapis",
+    "usdc",
+    "stablecoin",
+    "fetch",
+    "agent",
+    "micropayments",
+    "non-custodial"
+  ],
   "type": "module",
   "private": true,
   "main": "src/index.js",
   "exports": {
     ".": "./src/index.js"
+  },
+  "files": [
+    "src"
+  ],
+  "publishConfig": {
+    "access": "public"
   },
   "scripts": {
     "test": "node --test \"tests/**/*.test.js\"",

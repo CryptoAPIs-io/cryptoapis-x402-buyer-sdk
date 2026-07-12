@@ -1,4 +1,4 @@
-# CLAUDE.md — @cryptoapis/x402-buyer-sdk
+# CLAUDE.md — @cryptoapis-io/x402-buyer-sdk
 
 The **buyer-side** x402 client SDK (Node 18+, ESM, zero runtime deps): a `fetch` wrapper that auto-pays
 HTTP 402 responses. One of the x402 client surfaces (siblings: `cryptoapis-x402-merchant-sdk` = the

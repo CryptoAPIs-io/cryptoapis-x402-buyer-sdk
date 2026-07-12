@@ -1,5 +1,5 @@
 /**
- * CryptoAPIs x402 buyer SDK (`@cryptoapis/x402-buyer-sdk`) — a `fetch` wrapper that
+ * CryptoAPIs x402 buyer SDK (`@cryptoapis-io/x402-buyer-sdk`) — a `fetch` wrapper that
  * transparently pays HTTP 402 responses (parse → authorize → sign locally → retry).
  *
  * NON-CUSTODIAL: the SDK holds no keys. You pass a `signer` (e.g. wrapping
