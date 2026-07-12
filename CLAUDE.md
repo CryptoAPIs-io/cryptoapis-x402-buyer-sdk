@@ -12,10 +12,18 @@ holds NO keys and signs NOTHING** — the caller passes a `signer`; signing happ
 2. Parse the 402 body's `accepts` (PaymentRequirements list); pick one (respecting `allowedNetworks`).
    None acceptable → return the 402 unchanged.
 3. POST it to the buyer **`/authorize`** (`authorizeClient.js`) → `{ scheme, signing }`.
-4. **Sign locally** via `signer` (per-scheme dispatch in `signToPayload`). v1: `eip712` →
-   `signer.signTypedData(signing)`; other schemes throw `unsupported_scheme`.
+4. **Sign locally** via `signer` (per-scheme dispatch in `signToPayload`). All 6 artifact schemes wired:
+   `eip712`→`signTypedData`, `svm-transaction`→`signSvm`, `tron-transaction`→`signTron`,
+   `utxo-transaction`→`signUtxo`, `kaspa-transaction`→`signKaspa`, `xrp-transaction`→`signXrp`. A scheme
+   whose signer method is absent throws (`signer.X is required`); an unknown scheme → `unsupported_scheme`.
 5. Build the x402 `PaymentPayload` (`paymentPayload.js`), base64 into the **`X-PAYMENT`** header, and
    **retry the original request once**.
+
+**CRITICAL — the two meanings of "scheme":** the buyer `/authorize` returns an ARTIFACT scheme
+(`eip712`/`svm-transaction`/…) that tells the client HOW to sign. The WIRE `paymentPayload.scheme` is
+**always `exact`** — the facilitator's `parseEnvelope` rejects anything else, and derives the family from
+`network` (`familyOf`). So the SDK signs by the artifact scheme but emits `scheme:'exact'` + `network`.
+requirements↔payload are paired by **network**, never scheme.
 
 ## Modules (`src/`)
 - `authorizeClient.js` — `createAuthorizeClient({apiKey, baseUrl, fetchImpl})` → `authorize({paymentRequirements, walletId})`. Buyer service at `ai.cryptoapis.io/x402/buyer/*`, `x-api-key` (X402_BUYER). Non-2xx throws (budget/auth).
@@ -45,6 +53,8 @@ npm run lint      # eslint (@common; tests relax jsdoc/object-shorthand)
 Tests live under `tests/`, never colocated.
 
 ## Status
-Code-only (built + unit-tested, 12 tests + a real-signer E2E; not published). v1: EVM `eip712`
-end-to-end. Per-scheme dispatch → SVM/UTXO/XRP/Kaspa slot in as their signer paths land. An agentic
-`x402_pay` MCP tool can wrap this core later.
+Code-only (built + unit-tested, 22 tests + a full-envelope real-signer E2E; not published). **All 6
+artifact schemes wired** (EVM/SVM/Tron/UTXO/Kaspa/XRP); EVM is verified end-to-end (SDK → mcp-signer →
+`parseEnvelope` accepts + `eip3009.verifyAuthorization` recovers the buyer). Non-EVM schemes are wired +
+unit-tested but await their signer implementations being exercised live. An agentic `x402_pay` MCP tool
+can wrap this core later.

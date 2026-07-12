@@ -8,17 +8,22 @@
  *   4. build the `PaymentPayload` + base64 `X-PAYMENT` header and RETRY the request once
  *
  * NON-CUSTODIAL: the SDK never holds a key. The caller passes a `signer` implementing
- * the scheme it wants to support (e.g. `signTypedData` for EVM `eip712` — the exact
- * shape `@cryptoapis-io/mcp-signer` `evm_sign` `sign-typed-data` produces).
+ * only the scheme(s) it wants to support. Each maps 1:1 to a `@cryptoapis-io/mcp-signer`
+ * capability (the intended signer):
+ *   - `eip712`          → `signer.signTypedData(typedData)` → 65-byte sig      (evm_sign sign-typed-data)
+ *   - `svm-transaction` → `signer.signSvm({transaction})` → base64 signed tx   (svm_sign partial-sign)
+ *   - `tron-transaction`→ `signer.signTron({transaction})` → {txID,raw_data_hex,signature} (tron_sign)
+ *   - `utxo-transaction`→ `signer.signUtxo({preparedTransaction, network})` → signed raw hex (utxo_sign)
+ *   - `kaspa-transaction`→ `signer.signKaspa({preparedTransaction})` → signed tx JSON  (kaspa-wasm/kaspa_sign)
+ *   - `xrp-transaction` → `signer.signXrp({transaction})` → signed tx_blob     (xrp_sign)
  *
- * v1 supports the **EVM `eip712`** scheme end-to-end (the only enabled chain). Other
- * schemes throw `unsupported_scheme` until their signer path is wired — the structure
- * is a per-scheme dispatch so adding one is localized.
+ * A scheme with no matching signer method throws `unsupported_scheme` — so a caller who
+ * only wires EVM still works on EVM and fails clearly elsewhere.
  */
 
 import { createAuthorizeClient } from './authorizeClient.js';
 import {
-    parse402, buildEip712Payload, encodePaymentHeader
+    parse402, buildEip712Payload, buildTransactionPayload, encodePaymentHeader
 } from './paymentPayload.js';
 
 /**
@@ -76,19 +81,85 @@ function createX402Fetch({ apiKey, walletId, signer, allowedNetworks, baseUrl, f
      * @throws {Error} `unsupported_scheme` when the scheme has no wired signer path
      */
     async function signToPayload({ scheme, signing, requirements }) {
+        const network = requirements.network;
+
+        // EVM eip712 — detached typed-data signature + the message as the authorization.
         if (scheme === 'eip712') {
-            if (typeof signer.signTypedData !== 'function') {
-                throw new Error('signer.signTypedData is required for the eip712 scheme');
-            }
-            // `signing` is the EIP-712 typed-data { domain, types, primaryType, message }.
+            requireSigner('signTypedData', scheme);
             const signature = await signer.signTypedData(signing);
             return buildEip712Payload({
-                network: requirements.network,
+                network: network,
                 authorization: signing.message,
                 signature: signature,
             });
         }
-        throw new Error(`unsupported_scheme: ${scheme} (v1 buyer SDK supports eip712; other schemes are pending)`);
+
+        // Every non-EVM family: sign the artifact, wrap the signed tx in { transaction }.
+        // The signer returns the exact tx form that family's parsePayload reads.
+        if (scheme === 'svm-transaction') {
+            requireSigner('signSvm', scheme);
+            // signing = { transaction: <base64 unsigned> } → partial-sign → base64.
+            const transaction = await signer.signSvm({ transaction: signing.transaction });
+            return buildTransactionPayload({
+                network,
+                transaction
+            });
+        }
+        if (scheme === 'tron-transaction') {
+            requireSigner('signTron', scheme);
+            // signing = { transaction: <TronWeb tx> } → sign → {txID, raw_data_hex, signature}.
+            const transaction = await signer.signTron({ transaction: signing.transaction });
+            return buildTransactionPayload({
+                network,
+                transaction
+            });
+        }
+        if (scheme === 'utxo-transaction') {
+            requireSigner('signUtxo', scheme);
+            // signing = { preparedTransaction } → verify outputs + fully sign → signed raw hex.
+            const transaction = await signer.signUtxo({
+                preparedTransaction: signing.preparedTransaction,
+                network: network
+            });
+            return buildTransactionPayload({
+                network,
+                transaction
+            });
+        }
+        if (scheme === 'kaspa-transaction') {
+            requireSigner('signKaspa', scheme);
+            // signing = { preparedTransaction } → schnorr fully sign → signed tx JSON.
+            const transaction = await signer.signKaspa({ preparedTransaction: signing.preparedTransaction });
+            return buildTransactionPayload({
+                network,
+                transaction
+            });
+        }
+        if (scheme === 'xrp-transaction') {
+            requireSigner('signXrp', scheme);
+            // signing = { transaction: <unsigned Payment> } → sign → signed tx_blob.
+            const transaction = await signer.signXrp({ transaction: signing.transaction });
+            return buildTransactionPayload({
+                network,
+                transaction
+            });
+        }
+
+        throw new Error(`unsupported_scheme: ${scheme}`);
+    }
+
+    /**
+     * Assert the caller's signer implements the method a scheme needs.
+     *
+     * @param {string} method the required signer method name
+     * @param {string} scheme the scheme requiring it
+     * @return {void}
+     * @throws {Error} when the signer lacks the method
+     */
+    function requireSigner(method, scheme) {
+        if (typeof signer[method] !== 'function') {
+            throw new Error(`signer.${method} is required for the ${scheme} scheme`);
+        }
     }
 
     /**

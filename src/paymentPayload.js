@@ -2,14 +2,22 @@
  * Turn a signed x402 authorization into the `PaymentPayload` + the base64 `X-PAYMENT`
  * header the buyer resubmits to the merchant.
  *
- * The PaymentPayload wire shape (from `@cryptoapis/x402-core`):
+ * The PaymentPayload wire shape (from `@cryptoapis/x402-core` `parseEnvelope`):
  *   { x402Version, scheme, network, payload: <family-specific> }
- * For EVM (`eip712`) the family payload is `{ signature, authorization }`; other
- * families carry their signed tx/blob (added as those buyer paths are wired here).
+ *
+ * **CRITICAL:** `paymentPayload.scheme` is ALWAYS `'exact'` (the PAYMENT scheme —
+ * `parseEnvelope` rejects anything else). It is NOT the buyer `/authorize` artifact
+ * scheme (`eip712`/`svm-transaction`/…): that only tells the client HOW to sign. The
+ * FAMILY is carried by `network` (`familyOf(network)`), and requirements↔payload are
+ * paired by `network`, not by scheme. For EVM the family payload is
+ * `{ signature, authorization }`; other families carry `{ transaction: <signed> }`.
  */
 
 /** x402 protocol version. @type {number} */
 const X402_VERSION = 2;
+
+/** The PAYMENT scheme — always `exact` on the wire (the family is in `network`). @type {string} */
+const SCHEME_EXACT = 'exact';
 
 /**
  * Parse a merchant's HTTP 402 body into its `accepts` list.
@@ -36,11 +44,36 @@ function parse402(body) {
 function buildEip712Payload({ network, authorization, signature }) {
     return {
         x402Version: X402_VERSION,
-        scheme: 'eip712',
+        scheme: SCHEME_EXACT,
         network: network,
         payload: {
             signature: signature,
             authorization: authorization,
+        },
+    };
+}
+
+/**
+ * Build a transaction-carrying PaymentPayload — the shape every NON-EVM family uses
+ * (SVM/Tron/UTXO/Kaspa/XRP). Each family's `parsePayload` reads `payload.transaction`
+ * (the signed tx: base64 for SVM, signed-object for Tron, raw hex for UTXO, JSON for
+ * Kaspa, tx_blob for XRP). The signer produced this `transaction`; we only wrap it.
+ *
+ * `scheme` is `'exact'` (NOT the family) and the family comes from `network` — same
+ * rule as the EVM payload; the facilitator's `parseEnvelope` requires it.
+ *
+ * @param {Object} params inputs
+ * @param {string} params.network the CAIP-2 network id (carries the family via familyOf)
+ * @param {*} params.transaction the signed transaction (string or object, per family)
+ * @return {{x402Version: number, scheme: string, network: string, payload: {transaction: *}}} the PaymentPayload
+ */
+function buildTransactionPayload({ network, transaction }) {
+    return {
+        x402Version: X402_VERSION,
+        scheme: SCHEME_EXACT,
+        network: network,
+        payload: {
+            transaction: transaction,
         },
     };
 }
@@ -58,6 +91,8 @@ function encodePaymentHeader(paymentPayload) {
 export {
     parse402,
     buildEip712Payload,
+    buildTransactionPayload,
     encodePaymentHeader,
     X402_VERSION,
+    SCHEME_EXACT,
 };

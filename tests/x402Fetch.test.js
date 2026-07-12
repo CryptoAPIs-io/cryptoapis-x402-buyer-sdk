@@ -128,12 +128,152 @@ test('402 → authorize → sign → retry with X-PAYMENT → 200', async () => 
     assert.equal(signedPayload.primaryType, 'TransferWithAuthorization');
     // the retry carried an X-PAYMENT header encoding the eip712 payload
     const decoded = JSON.parse(Buffer.from(seen.retryHeaders['x-payment'], 'base64').toString('utf8'));
-    assert.equal(decoded.scheme, 'eip712');
+    assert.equal(decoded.scheme, 'exact'); // wire scheme is always 'exact' (family is in network)
     assert.equal(decoded.payload.signature, '0xdeadbeefsig');
     assert.deepEqual(decoded.payload.authorization, authorizeResponse.signing.message);
 });
 
-test('unsupported scheme throws unsupported_scheme', async () => {
+// Each non-EVM scheme: /authorize returns its signing artifact, the matching signer
+// method produces the signed tx, and the SDK wraps it as { payload: { transaction } }.
+const NON_EVM_CASES = [
+    {
+        scheme: 'svm-transaction',
+        network: 'solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp',
+        method: 'signSvm',
+        signing: { transaction: 'BASE64UNSIGNED' },
+        signed: 'BASE64SIGNED'
+    },
+    {
+        scheme: 'tron-transaction',
+        network: 'tron:0x2b6653dc',
+        method: 'signTron',
+        // eslint-disable-next-line camelcase
+        signing: { transaction: { raw_data: {} } },
+        signed: {
+            txID: 'T',
+            // eslint-disable-next-line camelcase
+            raw_data_hex: 'R',
+            signature: ['S']
+        }
+    },
+    {
+        scheme: 'utxo-transaction',
+        network: 'bip122:000000000019d6689c085ae165831e93',
+        method: 'signUtxo',
+        signing: { preparedTransaction: { inputs: []} },
+        signed: '0100signedhex'
+    },
+    {
+        scheme: 'kaspa-transaction',
+        network: 'kaspa:mainnet',
+        method: 'signKaspa',
+        signing: { preparedTransaction: {} },
+        signed: {
+            id: 'k',
+            inputs: []
+        }
+    },
+    {
+        scheme: 'xrp-transaction',
+        network: 'xrpl:0',
+        method: 'signXrp',
+        signing: { transaction: { TransactionType: 'Payment' } },
+        signed: '120000SIGNEDBLOB'
+    },
+];
+
+for (const c of NON_EVM_CASES) {
+    test(`${c.scheme}: authorize → ${c.method} → { payload: { transaction } } retry`, async () => {
+        const reqsC = {
+            ...reqs,
+            network: c.network
+        };
+        let retryHeaders;
+        let signerGot;
+        const fetchImpl = async (url, init) => {
+            const u = String(url);
+            if (u.endsWith('/authorize')) {
+                return resp({
+                    status: 200,
+                    body: {
+                        scheme: c.scheme,
+                        signing: c.signing
+                    }
+                });
+            }
+            if (init && init.headers && init.headers['x-payment']) {
+                retryHeaders = init.headers; return resp({
+                    status: 200,
+                    body: { paid: true }
+                });
+            }
+            return resp({
+                status: 402,
+                body: {
+                    x402Version: 2,
+                    accepts: [reqsC]
+                }
+            });
+        };
+        const signer = { [c.method]: async (arg) => { signerGot = arg; return c.signed; } };
+        const f = createX402Fetch({
+            apiKey: 'K',
+            walletId: 'w1',
+            signer,
+            fetchImpl
+        });
+
+        const r = await f('https://api/premium');
+        assert.equal(r.status, 200);
+        // signer received the artifact from /authorize (non-custodial)
+        assert.ok(signerGot);
+        // the X-PAYMENT wraps the SIGNED tx under payload.transaction, correct scheme+network
+        const decoded = JSON.parse(Buffer.from(retryHeaders['x-payment'], 'base64').toString('utf8'));
+        assert.equal(decoded.scheme, 'exact'); // wire scheme is always 'exact'
+        assert.equal(decoded.network, c.network);
+        assert.deepEqual(decoded.payload.transaction, c.signed);
+    });
+
+    test(`${c.scheme}: missing signer.${c.method} → clear error`, async () => {
+        const reqsC = {
+            ...reqs,
+            network: c.network
+        };
+        let n = 0;
+        const fetchImpl = async (url) => {
+            n += 1;
+            if (String(url).endsWith('/authorize')) {
+                return resp({
+                    status: 200,
+                    body: {
+                        scheme: c.scheme,
+                        signing: c.signing
+                    }
+                });
+            }
+            if (n === 1) {
+                return resp({
+                    status: 402,
+                    body: {
+                        x402Version: 2,
+                        accepts: [reqsC]
+                    }
+                });
+            }
+            return resp({ status: 200 });
+        };
+        // signer implements only EVM → the non-EVM scheme must fail clearly
+        const f = createX402Fetch({
+            apiKey: 'K',
+            walletId: 'w1',
+            signer: { signTypedData: async () => '0x' },
+            fetchImpl
+        });
+        await assert.rejects(() => f('https://api/premium'), new RegExp(`signer.${c.method} is required`));
+    });
+}
+
+test('a genuinely unknown scheme throws unsupported_scheme', async () => {
     let n = 0;
     const fetchImpl = async (url) => {
         n += 1;
@@ -144,16 +284,17 @@ test('unsupported scheme throws unsupported_scheme', async () => {
                     x402Version: 2,
                     accepts: [{
                         ...reqs,
-                        network: 'tron:0x2b6653dc'
+                        network: 'cosmos:hub'
                     }]
                 }
             });
         }
         if (String(url).endsWith('/authorize')) {
+            // an unrecognized scheme the SDK has no dispatch for
             return resp({
                 status: 200,
                 body: {
-                    scheme: 'tron-transaction',
+                    scheme: 'cosmos-adr36',
                     signing: {}
                 }
             });
@@ -166,7 +307,7 @@ test('unsupported scheme throws unsupported_scheme', async () => {
         signer: { signTypedData: async () => '0x' },
         fetchImpl
     });
-    await assert.rejects(() => f('https://api/premium'), /unsupported_scheme: tron-transaction/);
+    await assert.rejects(() => f('https://api/premium'), /unsupported_scheme: cosmos-adr36/);
 });
 
 test('402 with no acceptable network → returns the 402 unchanged (no authorize)', async () => {

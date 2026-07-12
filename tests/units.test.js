@@ -82,7 +82,7 @@ test('buildEip712Payload → the x402 PaymentPayload wire shape', () => {
         signature: '0xsig'
     });
     assert.equal(p.x402Version, 2);
-    assert.equal(p.scheme, 'eip712');
+    assert.equal(p.scheme, 'exact'); // wire scheme is always exact
     assert.equal(p.network, 'eip155:8453');
     assert.deepEqual(p.payload, {
         signature: '0xsig',
@@ -97,5 +97,5 @@ test('encodePaymentHeader round-trips', () => {
         signature: '0xs'
     });
     const decoded = JSON.parse(Buffer.from(encodePaymentHeader(p), 'base64').toString('utf8'));
-    assert.equal(decoded.scheme, 'eip712');
+    assert.equal(decoded.scheme, 'exact');
 });
