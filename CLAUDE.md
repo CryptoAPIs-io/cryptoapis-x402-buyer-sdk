@@ -53,8 +53,7 @@ npm run lint      # eslint (@common; tests relax jsdoc/object-shorthand)
 Tests live under `tests/`, never colocated.
 
 ## Status
-Code-only (built + unit-tested, 22 tests + a full-envelope real-signer E2E; not published). **All 6
+Code-only (built + unit-tested, 28 tests (incl. agent adapters) + a full-envelope real-signer E2E; not published). **All 6
 artifact schemes wired** (EVM/SVM/Tron/UTXO/Kaspa/XRP); EVM is verified end-to-end (SDK → mcp-signer →
 `parseEnvelope` accepts + `eip3009.verifyAuthorization` recovers the buyer). Non-EVM schemes are wired +
-unit-tested but await their signer implementations being exercised live. An agentic `x402_pay` MCP tool
-can wrap this core later.
+unit-tested but await their signer implementations being exercised live. Agent adapters shipped: `/agent` (neutral), `/ai-sdk`, `/langchain`, `/function-calling` (OpenAI/Anthropic/Gemini); the MCP surface is `@cryptoapis-io/mcp-x402-pay`.

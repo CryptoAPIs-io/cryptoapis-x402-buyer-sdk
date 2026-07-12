@@ -24,7 +24,11 @@
   "private": true,
   "main": "src/index.js",
   "exports": {
-    ".": "./src/index.js"
+    ".": "./src/index.js",
+    "./agent": "./src/agentTool.js",
+    "./ai-sdk": "./src/ai-sdk.js",
+    "./langchain": "./src/langchain.js",
+    "./function-calling": "./src/function-calling.js"
   },
   "files": [
     "src"
@@ -44,5 +48,21 @@
     "eslint-plugin-jsdoc": "^46.10.1",
     "eslint-plugin-node": "^11.1.0",
     "eslint-plugin-promise": "^6.6.0"
+  },
+  "peerDependencies": {
+    "ai": ">=3.0.0",
+    "@langchain/core": ">=0.2.0",
+    "zod": ">=3.0.0"
+  },
+  "peerDependenciesMeta": {
+    "ai": {
+      "optional": true
+    },
+    "@langchain/core": {
+      "optional": true
+    },
+    "zod": {
+      "optional": true
+    }
   }
 }
