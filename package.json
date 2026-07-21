@@ -23,21 +23,39 @@
   "type": "module",
   "main": "src/index.js",
   "exports": {
-    ".": "./src/index.js",
-    "./agent": "./src/agentTool.js",
-    "./ai-sdk": "./src/ai-sdk.js",
-    "./langchain": "./src/langchain.js",
-    "./function-calling": "./src/function-calling.js"
+    ".": {
+      "types": "./types/index.d.ts",
+      "import": "./src/index.js"
+    },
+    "./agent": {
+      "types": "./types/agentTool.d.ts",
+      "import": "./src/agentTool.js"
+    },
+    "./ai-sdk": {
+      "types": "./types/ai-sdk.d.ts",
+      "import": "./src/ai-sdk.js"
+    },
+    "./langchain": {
+      "types": "./types/langchain.d.ts",
+      "import": "./src/langchain.js"
+    },
+    "./function-calling": {
+      "types": "./types/function-calling.d.ts",
+      "import": "./src/function-calling.js"
+    }
   },
   "files": [
-    "src"
+    "src",
+    "types"
   ],
   "publishConfig": {
     "access": "public"
   },
   "scripts": {
     "test": "node --test \"tests/**/*.test.js\"",
-    "lint": "eslint ./src/ ./tests/"
+    "lint": "eslint ./src/ ./tests/",
+    "prepublishOnly": "npm run lint && npm test && npm run build:types",
+    "build:types": "tsc"
   },
   "devDependencies": {
     "eslint": "^8.57.1",
@@ -45,7 +63,8 @@
     "eslint-plugin-import": "^2.32.0",
     "eslint-plugin-jsdoc": "^46.10.1",
     "eslint-plugin-n": "^16.6.2",
-    "eslint-plugin-promise": "^6.6.0"
+    "eslint-plugin-promise": "^6.6.0",
+    "typescript": "^5.9.3"
   },
   "peerDependencies": {
     "@langchain/core": ">=0.2.0",
@@ -62,5 +81,9 @@
     "zod": {
       "optional": true
     }
-  }
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "types": "./types/index.d.ts"
 }
