@@ -34,10 +34,12 @@ test('authorize requires apiKey', () => {
     assert.throws(() => createAuthorizeClient({}), /apiKey is required/);
 });
 
-test('authorize posts {paymentRequirements, walletId} with x-api-key', async () => {
+test('authorize posts {paymentRequirements, walletId} with x-api-key; maps signingPayload -> signing', async () => {
+    // The LIVE buyer service returns the artifact as `signingPayload` (+ `authorized`).
     const fetchImpl = mockFetch({
+        authorized: true,
         scheme: 'eip712',
-        signing: { primaryType: 'X' }
+        signingPayload: { primaryType: 'X' }
     });
     const c = createAuthorizeClient({
         apiKey: 'K1',
@@ -49,6 +51,8 @@ test('authorize posts {paymentRequirements, walletId} with x-api-key', async () 
         walletId: 'w9'
     });
     assert.equal(res.scheme, 'eip712');
+    // authorizeClient normalizes the live `signingPayload` to the SDK-internal `signing`.
+    assert.deepEqual(res.signing, { primaryType: 'X' });
     const call = fetchImpl.calls[0];
     assert.equal(call.url, 'https://buyer/x402/buyer/authorize');
     assert.equal(call.opts.headers['x-api-key'], 'K1');
@@ -56,6 +60,21 @@ test('authorize posts {paymentRequirements, walletId} with x-api-key', async () 
         paymentRequirements: { a: 1 },
         walletId: 'w9'
     });
+});
+
+test('authorize still accepts a legacy `signing` field (back-compat)', async () => {
+    const c = createAuthorizeClient({
+        apiKey: 'K1',
+        fetchImpl: mockFetch({
+            scheme: 'eip712',
+            signing: { primaryType: 'Y' }
+        })
+    });
+    const res = await c.authorize({
+        paymentRequirements: {},
+        walletId: 'w'
+    });
+    assert.deepEqual(res.signing, { primaryType: 'Y' });
 });
 
 test('authorize throws on non-2xx (budget/auth error)', async () => {

@@ -1,7 +1,7 @@
 {
   "name": "@cryptoapis-io/x402-buyer-sdk",
   "version": "0.1.0",
-  "description": "CryptoAPIs x402 buyer SDK \u2014 a fetch wrapper that auto-pays HTTP 402 responses (authorize \u2192 sign locally \u2192 retry). Non-custodial: you provide the signer; keys never enter the SDK.",
+  "description": "CryptoAPIs x402 buyer SDK — a fetch wrapper that auto-pays HTTP 402 responses (authorize → sign locally → retry). Non-custodial: you provide the signer; keys never enter the SDK.",
   "license": "MIT",
   "author": "Crypto APIs, Inc.",
   "repository": {
@@ -21,7 +21,6 @@
     "non-custodial"
   ],
   "type": "module",
-  "private": true,
   "main": "src/index.js",
   "exports": {
     ".": "./src/index.js",
@@ -40,18 +39,17 @@
     "test": "node --test \"tests/**/*.test.js\"",
     "lint": "eslint ./src/ ./tests/"
   },
-  "dependencies": {},
   "devDependencies": {
-    "@common/eslint-config-nodejs": "bitbucket:menadev/common-eslint-config-nodejs#master",
     "eslint": "^8.57.1",
+    "eslint-config-standard": "^17.1.0",
     "eslint-plugin-import": "^2.32.0",
     "eslint-plugin-jsdoc": "^46.10.1",
-    "eslint-plugin-node": "^11.1.0",
+    "eslint-plugin-n": "^16.6.2",
     "eslint-plugin-promise": "^6.6.0"
   },
   "peerDependencies": {
-    "ai": ">=3.0.0",
     "@langchain/core": ">=0.2.0",
+    "ai": ">=3.0.0",
     "zod": ">=3.0.0"
   },
   "peerDependenciesMeta": {

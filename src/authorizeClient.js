@@ -52,7 +52,14 @@ function createAuthorizeClient({ apiKey, baseUrl = DEFAULT_BASE_URL, fetchImpl }
                 const text = await res.text().catch(() => '');
                 throw new Error(`buyer /authorize failed: ${res.status} ${text}`.trim());
             }
-            return res.json();
+            const body = await res.json();
+            // The buyer service returns the artifact-to-sign as `signingPayload`; expose it to the
+            // rest of the SDK under the internal `signing` name (older builds used `signing`, so we
+            // accept either for forward/backward resilience). See buyer authorizeService.
+            return {
+                ...body,
+                signing: body.signingPayload ?? body.signing,
+            };
         },
     };
 }
