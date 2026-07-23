@@ -62,7 +62,7 @@ const wallet = new Wallet(process.env.PRIVATE_KEY);   // your key — stays in y
 
 const fetch402 = createX402Fetch({
   apiKey:   process.env.CRYPTOAPIS_API_KEY,           // CryptoAPIs key with the X402_BUYER feature
-  walletId: 'your-agent-wallet-id',                   // the wallet the buyer service pays from
+  walletId: 'your-agent-wallet-id',                   // the id from POST /wallets (a registry _id, NOT the chain address)
   signer:   { signTypedData: (td) => wallet.signTypedData(td.domain, td.types, td.message) },
 });
 
@@ -180,7 +180,7 @@ authorize→sign→retry cycle per request (no loops).
 | Option | Required | Description |
 |---|---|---|
 | `apiKey` | ✓ | CryptoAPIs API key with the `X402_BUYER` feature |
-| `walletId` | ✓ | the agent wallet the buyer service authorizes payments from |
+| `walletId` | ✓ | the buyer-service **wallet record id** returned by `POST /wallets` (the registry `_id`) — **NOT the on-chain address**. Passing an address gets `wallet_not_found`. |
 | `signer` | ✓ | your local signer (see the table above) — the SDK holds no keys |
 | `allowedNetworks` | | restrict which CAIP-2 networks you'll pay on, e.g. `['eip155:8453']` |
 | `baseUrl` | | buyer service base URL (default `https://ai.cryptoapis.io/x402/buyer`) |
