@@ -19,6 +19,39 @@ npm install @cryptoapis-io/x402-buyer-sdk
 
 ---
 
+## Prerequisite — create an agent wallet (get your `walletId`)
+
+The SDK pays from a CryptoAPIs **agent wallet**, referenced by `walletId`. Create one once (per
+blockchain+network) with a single `POST` to the buyer API — it returns the `walletId` you pass to the SDK.
+**Non-custodial:** you register only your PUBLIC `address` (or an `xpub`); the private key never leaves
+your process.
+
+```bash
+curl -X POST https://ai.cryptoapis.io/x402/buyer/wallets \
+  -H "x-api-key: $CRYPTOAPIS_API_KEY" \
+  -H "content-type: application/json" \
+  -d '{
+    "blockchain": "base",
+    "network":    "eip155:8453",
+    "address":    "0xYourWalletAddress"
+  }'
+# → { "walletId": "…", "address": "0xYourWalletAddress", "type": "address" }
+```
+
+Required fields (a malformed body returns a clear `400 malformed_request`, never a silent failure):
+
+| Field | Required | Notes |
+|---|---|---|
+| `network` | ✓ | the **[CAIP-2](https://chainagnostic.org/CAIPs/caip-2) id** — e.g. `eip155:8453` (Base), `solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp` (Solana mainnet). **Not** a bare name like `"base"` or `"mainnet"`. |
+| `blockchain` | | human name (`base`, `solana`, …) — informational |
+| **one of** `address` \| `xpub` | ✓ | **address mode**: bring your own `address` (works on every chain, incl. **Solana/Kaspa which are address-only**). **xpub mode**: supply an `xpub` (+ optional `derivationPath`) on xpub-capable chains — the service derives the address. Supplying neither or both → `400`. |
+| `allowedNetworks` | | restrict which CAIP-2 networks this wallet may pay on |
+| `limits` | | optional per-tx / allowlist budget policy |
+
+> **Solana / SVM:** create the wallet in **address mode** (`address` = your Solana pubkey, base58) with
+> `network: "solana:<genesisHash>"`. Then `/authorize` for SVM also needs the merchant's
+> `requirements.extra` to carry `{ feePayer, decimals, tokenProgram }` (see the merchant SDK / facilitator).
+
 ## Quick start — a fetch that pays for itself
 
 ```js
