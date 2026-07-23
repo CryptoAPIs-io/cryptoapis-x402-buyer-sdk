@@ -21,20 +21,35 @@ npm install @cryptoapis-io/x402-buyer-sdk
 
 ## Prerequisite — create an agent wallet (get your `walletId`)
 
-The SDK pays from a CryptoAPIs **agent wallet**, referenced by `walletId`. Create one once (per
-blockchain+network) with a single `POST` to the buyer API — it returns the `walletId` you pass to the SDK.
-**Non-custodial:** you register only your PUBLIC `address` (or an `xpub`); the private key never leaves
-your process.
+The SDK pays from a CryptoAPIs **agent wallet**, referenced by `walletId` — the buyer service's own record
+id, **not** the on-chain address. Register one once (per blockchain+network); it returns the `walletId` you
+pass to `createX402Fetch`. **Non-custodial:** you register only your PUBLIC `address` (or an `xpub`); the
+private key never leaves your process.
+
+Use the built-in helper (validates the input before the round-trip):
+
+```js
+import { createWalletsClient } from '@cryptoapis-io/x402-buyer-sdk';
+
+const wallets = createWalletsClient({ apiKey: process.env.CRYPTOAPIS_API_KEY });
+
+const { walletId } = await wallets.createWallet({
+  blockchain: 'base',
+  network:    'eip155:8453',            // CAIP-2 id — NOT a bare "base"
+  address:    '0xYourWalletAddress',    // your PUBLIC address (required for Solana/Kaspa)
+});
+// → pass walletId to createX402Fetch({ apiKey, walletId, signer })
+
+await wallets.listWallets();            // your registered wallets (each with its walletId)
+```
+
+Or the raw endpoint:
 
 ```bash
 curl -X POST https://ai.cryptoapis.io/x402/buyer/wallets \
   -H "x-api-key: $CRYPTOAPIS_API_KEY" \
   -H "content-type: application/json" \
-  -d '{
-    "blockchain": "base",
-    "network":    "eip155:8453",
-    "address":    "0xYourWalletAddress"
-  }'
+  -d '{ "blockchain": "base", "network": "eip155:8453", "address": "0xYourWalletAddress" }'
 # → { "walletId": "…", "address": "0xYourWalletAddress", "type": "address" }
 ```
 
@@ -184,9 +199,30 @@ authorize→sign→retry cycle per request (no loops).
 | `signer` | ✓ | your local signer (see the table above) — the SDK holds no keys |
 | `allowedNetworks` | | restrict which CAIP-2 networks you'll pay on, e.g. `['eip155:8453']` |
 | `baseUrl` | | buyer service base URL (default `https://ai.cryptoapis.io/x402/buyer`) |
+| `fetchImpl` | | a custom `fetch` implementation — for a corporate proxy / custom CA (see below) or testing |
 
 Amounts in `PaymentRequirements` are **atomic units** (USDC 6-decimals: `"10000"` = $0.01). Networks are
 [CAIP-2](https://chainagnostic.org/CAIPs/caip-2) (e.g. `eip155:8453` = Base).
+
+### Corporate proxies / custom CA
+
+Behind a TLS-intercepting corporate proxy, Node's global `fetch` fails with
+`UNABLE_TO_GET_ISSUER_CERT_LOCALLY` (it doesn't use the system trust store). Every SDK entry point
+(`createX402Fetch`, `createWalletsClient`, `createAuthorizeClient`) accepts a **`fetchImpl`** — pass a
+`fetch` bound to a custom CA / proxy agent (e.g. `undici`) and all calls route through it:
+
+```js
+import { fetch as undiciFetch, Agent } from 'undici';
+import { readFileSync } from 'node:fs';
+
+const agent = new Agent({ connect: { ca: readFileSync('/etc/corp/ca.pem') } });
+const fetchImpl = (url, init) => undiciFetch(url, { ...init, dispatcher: agent });
+
+const fetch402 = createX402Fetch({ apiKey, walletId, signer, fetchImpl });
+```
+
+For the **merchant SDK**, pass a custom `facilitatorClient` (or its `fetchImpl`) the same way — the low-level
+clients accept it. Do NOT disable TLS verification globally; inject the CA instead.
 
 ---
 

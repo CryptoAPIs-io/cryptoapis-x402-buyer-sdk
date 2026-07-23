@@ -141,6 +141,13 @@ const SUPPORTED_NON_EVM_CASES = [
         scheme: 'svm-transaction',
         network: 'solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp',
         method: 'signSvm',
+        // SVM requirements MUST carry extra.feePayer + decimals — the SDK now validates
+        // this client-side before /authorize (BL-0116).
+        extra: {
+            feePayer: '9BDfKHXNvY3pTW8JBDo9UNEv3u2QQx4gF6NkoZfeCKHG',
+            decimals: 6,
+            tokenProgram: 'spl-token'
+        },
         signing: { transaction: 'BASE64UNSIGNED' },
         signed: 'BASE64SIGNED'
     },
@@ -175,7 +182,8 @@ for (const c of SUPPORTED_NON_EVM_CASES) {
     test(`${c.scheme}: authorize → ${c.method} → { payload: { transaction } } retry`, async () => {
         const reqsC = {
             ...reqs,
-            network: c.network
+            network: c.network,
+            extra: c.extra ?? {}
         };
         let retryHeaders;
         let signerGot;
@@ -226,7 +234,8 @@ for (const c of SUPPORTED_NON_EVM_CASES) {
     test(`${c.scheme}: missing signer.${c.method} → clear error`, async () => {
         const reqsC = {
             ...reqs,
-            network: c.network
+            network: c.network,
+            extra: c.extra ?? {}
         };
         let n = 0;
         const fetchImpl = async (url) => {

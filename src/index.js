@@ -19,5 +19,11 @@ export {
     createAuthorizeClient, DEFAULT_BASE_URL
 } from './authorizeClient.js';
 export {
+    createWalletsClient, assertCreateWalletInput
+} from './walletsClient.js';
+export {
+    validatePaymentRequirements, familyOf
+} from './requirementsValidation.js';
+export {
     parse402, buildEip712Payload, encodePaymentHeader, X402_VERSION
 } from './paymentPayload.js';

@@ -25,6 +25,7 @@
  */
 
 import { createAuthorizeClient } from './authorizeClient.js';
+import { validatePaymentRequirements } from './requirementsValidation.js';
 import {
     parse402, buildEip712Payload, buildTransactionPayload, encodePaymentHeader
 } from './paymentPayload.js';
@@ -202,6 +203,11 @@ function createX402Fetch({ apiKey, walletId, signer, allowedNetworks, baseUrl, f
             // Nothing we can/will pay — hand the 402 back to the caller unchanged.
             return first;
         }
+
+        // Validate the merchant's requirements CLIENT-SIDE before the /authorize round-trip
+        // — a missing SVM extra.feePayer (etc.) throws a clear local error here instead of
+        // an opaque server response.
+        validatePaymentRequirements(requirements);
 
         const { scheme, signing } = await authorizeClient.authorize({
             paymentRequirements: requirements,
