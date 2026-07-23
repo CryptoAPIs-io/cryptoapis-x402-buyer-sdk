@@ -17,14 +17,25 @@
  *   - `kaspa-transaction`→ `signer.signKaspa({preparedTransaction})` → signed tx JSON  (kaspa-wasm/kaspa_sign)
  *   - `xrp-transaction` → `signer.signXrp({transaction})` → signed tx_blob     (xrp_sign)
  *
- * A scheme with no matching signer method throws `unsupported_scheme` — so a caller who
- * only wires EVM still works on EVM and fails clearly elsewhere.
+ * SUPPORTED FAMILIES: only **EVM** (`eip712`) and **Solana** (`svm-transaction`) are
+ * live-verified end-to-end and enabled. Tron, UTXO, XRP and Kaspa are wired but NOT yet
+ * live-verified, so they are gated OFF here and return a clear `family_not_yet_supported`
+ * error (they are on the roadmap — "upcoming"). Enabling a family once verified is a
+ * one-line addition to `SUPPORTED_SCHEMES`.
  */
 
 import { createAuthorizeClient } from './authorizeClient.js';
 import {
     parse402, buildEip712Payload, buildTransactionPayload, encodePaymentHeader
 } from './paymentPayload.js';
+
+/**
+ * Wire schemes this SDK currently supports (live-verified end-to-end). Other families
+ * (`tron-transaction`, `utxo-transaction`, `kaspa-transaction`, `xrp-transaction`) are
+ * wired but not yet live-verified — gated off until each is exercised in production.
+ * @type {Set<string>}
+ */
+const SUPPORTED_SCHEMES = new Set(['eip712', 'svm-transaction']);
 
 /**
  * Choose which of the merchant's accepted requirements to pay. Default: the first
@@ -82,6 +93,15 @@ function createX402Fetch({ apiKey, walletId, signer, allowedNetworks, baseUrl, f
      */
     async function signToPayload({ scheme, signing, requirements }) {
         const network = requirements.network;
+
+        // Gate off families that are wired but not yet live-verified (Tron/UTXO/XRP/Kaspa).
+        // EVM + Solana are supported today; the rest are on the roadmap.
+        if (!SUPPORTED_SCHEMES.has(scheme)) {
+            throw new Error(
+                `family_not_yet_supported: the "${scheme}" family is coming soon — ` +
+                'only EVM (eip712) and Solana (svm-transaction) are supported today'
+            );
+        }
 
         // EVM eip712 — detached typed-data signature + the message as the authorization.
         if (scheme === 'eip712') {

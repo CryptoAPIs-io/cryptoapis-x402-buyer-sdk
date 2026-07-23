@@ -8,7 +8,8 @@ your key**, and retries — so paywalled endpoints Just Work.
 
 - 🔒 **Non-custodial** — you provide the signer; **private keys never enter the SDK**.
 - 🪶 **Zero runtime dependencies** — pure `fetch` + `Buffer`. Node 18+ / any modern runtime.
-- 🌐 **6 chains** — EVM (Base, Ethereum, …), Solana, Tron, Bitcoin/UTXO, XRP, Kaspa.
+- 🌐 **Supported today** — EVM (Base, Ethereum, …) and Solana. Tron, Bitcoin/UTXO, XRP and Kaspa are
+  **upcoming** (wired but not yet enabled).
 - 🤖 **Agent-ready** — one-line adapters for the Vercel AI SDK, LangChain, MCP, and raw function-calling
   (OpenAI / Anthropic / Gemini).
 
@@ -96,14 +97,17 @@ out of the box.
 The SDK **never holds a key.** You pass a `signer` that signs locally (in your process, KMS, hardware
 wallet — your choice). Implement only the chain(s) you use:
 
-| Chain | `/authorize` scheme | `signer` method | Signs |
-|---|---|---|---|
-| **EVM** (Base, Ethereum, Polygon, …) | `eip712` | `signTypedData(typedData)` | the EIP-3009 `TransferWithAuthorization` |
-| **Solana** | `svm-transaction` | `signSvm({ transaction })` | the partial-signed base64 tx |
-| **Tron** | `tron-transaction` | `signTron({ transaction })` | the TRC-20 transfer |
-| **Bitcoin / UTXO** | `utxo-transaction` | `signUtxo({ preparedTransaction, network })` | the fully-signed raw tx |
-| **XRP** | `xrp-transaction` | `signXrp({ transaction })` | the signed `tx_blob` |
-| **Kaspa** | `kaspa-transaction` | `signKaspa({ preparedTransaction })` | the signed tx JSON |
+| Chain | Status | `/authorize` scheme | `signer` method | Signs |
+|---|---|---|---|---|
+| **EVM** (Base, Ethereum, Polygon, …) | ✅ Supported | `eip712` | `signTypedData(typedData)` | the EIP-3009 `TransferWithAuthorization` |
+| **Solana** | ✅ Supported | `svm-transaction` | `signSvm({ transaction })` | the partial-signed base64 tx |
+| **Tron** | 🚧 Upcoming | `tron-transaction` | `signTron({ transaction })` | the TRC-20 transfer |
+| **Bitcoin / UTXO** | 🚧 Upcoming | `utxo-transaction` | `signUtxo({ preparedTransaction, network })` | the fully-signed raw tx |
+| **XRP** | 🚧 Upcoming | `xrp-transaction` | `signXrp({ transaction })` | the signed `tx_blob` |
+| **Kaspa** | 🚧 Upcoming | `kaspa-transaction` | `signKaspa({ preparedTransaction })` | the signed tx JSON |
+
+> **Upcoming** families are wired but not yet enabled — attempting to pay on them returns a clear
+> `family_not_yet_supported` ("coming soon") error. EVM and Solana are live and verified end-to-end.
 
 Each maps 1:1 to a tool in **[`@cryptoapis-io/mcp-signer`](https://www.npmjs.com/package/@cryptoapis-io/mcp-signer)**
 if you'd rather not implement signing yourself:

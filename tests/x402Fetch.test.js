@@ -133,9 +133,10 @@ test('402 → authorize → sign → retry with X-PAYMENT → 200', async () => 
     assert.deepEqual(decoded.payload.authorization, authorizeResponse.signing.message);
 });
 
-// Each non-EVM scheme: /authorize returns its signing artifact, the matching signer
-// method produces the signed tx, and the SDK wraps it as { payload: { transaction } }.
-const NON_EVM_CASES = [
+// Non-EVM families that are LIVE-VERIFIED and enabled today: /authorize returns its
+// signing artifact, the matching signer method produces the signed tx, and the SDK wraps
+// it as { payload: { transaction } }. (Only Solana; Tron/UTXO/XRP/Kaspa are gated — below.)
+const SUPPORTED_NON_EVM_CASES = [
     {
         scheme: 'svm-transaction',
         network: 'solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp',
@@ -143,46 +144,34 @@ const NON_EVM_CASES = [
         signing: { transaction: 'BASE64UNSIGNED' },
         signed: 'BASE64SIGNED'
     },
+];
+
+// Families that are WIRED but NOT yet live-verified — gated off with a clear
+// `family_not_yet_supported` ("coming soon") error, even if the caller wires the signer.
+const GATED_CASES = [
     {
         scheme: 'tron-transaction',
         network: 'tron:0x2b6653dc',
-        method: 'signTron',
-        // eslint-disable-next-line camelcase
-        signing: { transaction: { raw_data: {} } },
-        signed: {
-            txID: 'T',
-            // eslint-disable-next-line camelcase
-            raw_data_hex: 'R',
-            signature: ['S']
-        }
+        method: 'signTron'
     },
     {
         scheme: 'utxo-transaction',
         network: 'bip122:000000000019d6689c085ae165831e93',
-        method: 'signUtxo',
-        signing: { preparedTransaction: { inputs: []} },
-        signed: '0100signedhex'
+        method: 'signUtxo'
     },
     {
         scheme: 'kaspa-transaction',
         network: 'kaspa:mainnet',
-        method: 'signKaspa',
-        signing: { preparedTransaction: {} },
-        signed: {
-            id: 'k',
-            inputs: []
-        }
+        method: 'signKaspa'
     },
     {
         scheme: 'xrp-transaction',
         network: 'xrpl:0',
-        method: 'signXrp',
-        signing: { transaction: { TransactionType: 'Payment' } },
-        signed: '120000SIGNEDBLOB'
+        method: 'signXrp'
     },
 ];
 
-for (const c of NON_EVM_CASES) {
+for (const c of SUPPORTED_NON_EVM_CASES) {
     test(`${c.scheme}: authorize → ${c.method} → { payload: { transaction } } retry`, async () => {
         const reqsC = {
             ...reqs,
@@ -273,7 +262,51 @@ for (const c of NON_EVM_CASES) {
     });
 }
 
-test('a genuinely unknown scheme throws unsupported_scheme', async () => {
+// A wired-but-not-yet-live family is gated OFF, even when the caller provides its signer:
+// the "coming soon" gate fires before the per-scheme dispatch.
+for (const c of GATED_CASES) {
+    test(`${c.scheme}: gated as coming-soon (family_not_yet_supported) even with a signer`, async () => {
+        let n = 0;
+        const fetchImpl = async (url) => {
+            n += 1;
+            if (n === 1) {
+                return resp({
+                    status: 402,
+                    body: {
+                        x402Version: 2,
+                        accepts: [{
+                            ...reqs,
+                            network: c.network
+                        }]
+                    }
+                });
+            }
+            if (String(url).endsWith('/authorize')) {
+                return resp({
+                    status: 200,
+                    body: {
+                        scheme: c.scheme,
+                        signing: {}
+                    }
+                });
+            }
+            return resp({ status: 200 });
+        };
+        const f = createX402Fetch({
+            apiKey: 'K',
+            walletId: 'w1',
+            // wire BOTH the EVM signer and this family's signer — the gate still refuses it
+            signer: {
+                signTypedData: async () => '0x',
+                [c.method]: async () => 'SIGNED'
+            },
+            fetchImpl
+        });
+        await assert.rejects(() => f('https://api/premium'), /family_not_yet_supported/);
+    });
+}
+
+test('a genuinely unknown scheme is refused (family_not_yet_supported)', async () => {
     let n = 0;
     const fetchImpl = async (url) => {
         n += 1;
@@ -307,7 +340,7 @@ test('a genuinely unknown scheme throws unsupported_scheme', async () => {
         signer: { signTypedData: async () => '0x' },
         fetchImpl
     });
-    await assert.rejects(() => f('https://api/premium'), /unsupported_scheme: cosmos-adr36/);
+    await assert.rejects(() => f('https://api/premium'), /family_not_yet_supported: .*cosmos-adr36/);
 });
 
 test('402 with no acceptable network → returns the 402 unchanged (no authorize)', async () => {
