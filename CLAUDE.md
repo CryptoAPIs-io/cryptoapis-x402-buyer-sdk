@@ -41,8 +41,8 @@ requirements↔payload are paired by **network**, never scheme.
 EVM (`eip712`): `signer.signTypedData(typedData) → Promise<signature>`, where `typedData` is the
 `{domain, types, primaryType, message}` from `/authorize`. This matches `@cryptoapis-io/mcp-signer`
 `evm_sign` `sign-typed-data` exactly — the intended signer. **Verified end-to-end:** SDK + real
-mcp-signer produces an `X-PAYMENT` whose signature the facilitator's `@cryptoapis/x402-evm`
-`eip3009.verifyAuthorization` recovers to the buyer (ethers-signer ↔ viem-verifier interop).
+mcp-signer produces an `X-PAYMENT` whose signature the facilitator's EIP-3009
+`verifyAuthorization` recovers to the buyer (ethers-signer ↔ viem-verifier interop).
 
 ## Commands
 ```bash

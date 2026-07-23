@@ -2,7 +2,7 @@
  * Turn a signed x402 authorization into the `PaymentPayload` + the base64 `X-PAYMENT`
  * header the buyer resubmits to the merchant.
  *
- * The PaymentPayload wire shape (from `@cryptoapis/x402-core` `parseEnvelope`):
+ * The PaymentPayload wire shape (what the facilitator's `parseEnvelope` accepts):
  *   { x402Version, scheme, network, payload: <family-specific> }
  *
  * **CRITICAL:** `paymentPayload.scheme` is ALWAYS `'exact'` (the PAYMENT scheme —
