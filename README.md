@@ -61,7 +61,7 @@ Required fields (a malformed body returns a clear `400 malformed_request`, never
 | `blockchain` | | human name (`base`, `solana`, …) — informational |
 | **one of** `address` \| `xpub` | ✓ | **address mode**: bring your own `address` (works on every chain, incl. **Solana/Kaspa which are address-only**). **xpub mode**: supply an `xpub` (+ optional `derivationPath`) on xpub-capable chains — the service derives the address. Supplying neither or both → `400`. |
 | `allowedNetworks` | | restrict which CAIP-2 networks this wallet may pay on |
-| `limits` | | optional per-tx / allowlist budget policy |
+| `limits` | | optional budget policy — `{ perTxLimit?, dailyLimit?, monthlyLimit? }` (atomic-unit strings; omit/`null` = unlimited). **Only `perTxLimit` is enforced today**; `dailyLimit`/`monthlyLimit` are accepted + stored but **NOT yet enforced** (the response echoes `limitsNotEnforced: [...]` when you set one). Wallets are **unlimited by default** — set `perTxLimit` for a real cap. |
 
 > **Solana / SVM:** create the wallet in **address mode** (`address` = your Solana pubkey, base58) with
 > `network: "solana:<genesisHash>"`. Then `/authorize` for SVM also needs the merchant's

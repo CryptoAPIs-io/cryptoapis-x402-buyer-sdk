@@ -60,7 +60,10 @@ function createWalletsClient({ apiKey, baseUrl = DEFAULT_BASE_URL, fetchImpl } =
          * Register an agent wallet (once per blockchain+network) and return its `walletId`.
          *
          * @param {Object} input { blockchain?, network (CAIP-2 id), address | xpub, allowedNetworks?, allowedDomains?, limits? }
-         * @return {Promise<{walletId: string, address: string, type: string, existing?: boolean}>} the created (or existing) wallet
+         *   `limits` = `{ perTxLimit?, dailyLimit?, monthlyLimit? }` (atomic-unit strings; omit/null = unlimited).
+         *   **Only `perTxLimit` is enforced today**; `dailyLimit`/`monthlyLimit` are stored but NOT yet
+         *   enforced (the response echoes `limitsNotEnforced: [...]` when set). Wallets are unlimited by default.
+         * @return {Promise<{walletId: string, address: string, type: string, existing?: boolean, limitsNotEnforced?: Array<string>}>} the created (or existing) wallet
          * @throws {Error} locally on a malformed input, or on a non-2xx response
          */
         async createWallet(input) {
