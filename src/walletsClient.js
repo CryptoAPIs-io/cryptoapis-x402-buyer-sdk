@@ -60,10 +60,11 @@ function createWalletsClient({ apiKey, baseUrl = DEFAULT_BASE_URL, fetchImpl } =
          * Register an agent wallet (once per blockchain+network) and return its `walletId`.
          *
          * @param {Object} input { blockchain?, network (CAIP-2 id), address | xpub, allowedNetworks?, allowedDomains?, limits? }
-         *   `limits` = `{ perTxLimit?, dailyLimit?, monthlyLimit? }` (atomic-unit strings; omit/null = unlimited).
-         *   **Only `perTxLimit` is enforced today**; `dailyLimit`/`monthlyLimit` are stored but NOT yet
-         *   enforced (the response echoes `limitsNotEnforced: [...]` when set). Wallets are unlimited by default.
-         * @return {Promise<{walletId: string, address: string, type: string, existing?: boolean, limitsNotEnforced?: Array<string>}>} the created (or existing) wallet
+         *   `limits` = `{ perTxLimit?, dailyLimit?, monthlyLimit? }` (atomic-unit strings; omit a field = no cap for it).
+         *   All three ENFORCE at /authorize (per-tx + daily/monthly windowed spend). OMIT `limits` entirely and the
+         *   wallet gets DEFAULT safety caps (~$50/tx + $500/day, USDC-denominated) — the response then returns
+         *   `limits` + `limitsDefaulted:true`. Pass your own to override.
+         * @return {Promise<{walletId: string, address: string, type: string, existing?: boolean, limits?: Object, limitsDefaulted?: boolean}>} the created (or existing) wallet
          * @throws {Error} locally on a malformed input, or on a non-2xx response
          */
         async createWallet(input) {
