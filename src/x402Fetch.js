@@ -25,10 +25,11 @@
  */
 
 import { createAuthorizeClient } from './authorizeClient.js';
-import { validatePaymentRequirements } from './requirementsValidation.js';
 import {
-    parse402, buildEip712Payload, buildTransactionPayload, encodePaymentHeader,
-    withPaymentIdentifier
+    buildPaymentForChallenge, selectRequirements
+} from './payFlow.js';
+import {
+    parse402, buildEip712Payload, buildTransactionPayload, encodePaymentHeader
 } from './paymentPayload.js';
 
 /**
@@ -38,24 +39,6 @@ import {
  * @type {Set<string>}
  */
 const SUPPORTED_SCHEMES = new Set(['eip712', 'svm-transaction']);
-
-/**
- * Choose which of the merchant's accepted requirements to pay. Default: the first
- * one whose network is in `allowedNetworks` (if given), else the first.
- *
- * @param {Array<Object>} accepts the merchant's PaymentRequirements list
- * @param {Array<string>} [allowedNetworks] optional caller allowlist of CAIP-2 networks
- * @return {(Object|null)} the chosen requirements, or null if none acceptable
- */
-function selectRequirements(accepts, allowedNetworks) {
-    if (accepts.length === 0) {
-        return null;
-    }
-    if (Array.isArray(allowedNetworks) && allowedNetworks.length > 0) {
-        return accepts.find((r) => allowedNetworks.includes(r.network)) ?? null;
-    }
-    return accepts[0];
-}
 
 /**
  * Create a fetch wrapper bound to a buyer wallet + signer.
@@ -202,35 +185,22 @@ function createX402Fetch({ apiKey, walletId, signer, allowedNetworks, paymentId,
         }
 
         const body = await first.clone().json().catch(() => null);
-        const accepts = parse402(body);
-        const requirements = selectRequirements(accepts, allowedNetworks);
-        if (!requirements) {
+        // Shared with the MCP transport: select -> validate -> authorize -> sign -> attach
+        // the payment-identifier. Only the envelope differs between transports, so both run
+        // ONE implementation and a fix can never land on just one of them.
+        const built = await buildPaymentForChallenge({
+            accepts: parse402(body),
+            allowedNetworks: allowedNetworks,
+            authorizeClient: authorizeClient,
+            walletId: walletId,
+            signToPayload: signToPayload,
+            paymentId: paymentId,
+        });
+        if (!built) {
             // Nothing we can/will pay — hand the 402 back to the caller unchanged.
             return first;
         }
-
-        // Validate the merchant's requirements CLIENT-SIDE before the /authorize round-trip
-        // — a missing SVM extra.feePayer (etc.) throws a clear local error here instead of
-        // an opaque server response.
-        validatePaymentRequirements(requirements);
-
-        const { scheme, signing } = await authorizeClient.authorize({
-            paymentRequirements: requirements,
-            walletId: walletId,
-        });
-        const signedPayload = await signToPayload({
-            scheme,
-            signing,
-            requirements
-        });
-        // `payment-identifier` (x402 extension): when the caller supplies an id it becomes
-        // the facilitator's idempotency key, so a retry of a request whose response never
-        // arrived settles once rather than twice. Resolved per-request so a caller can key
-        // it to their own job/request id.
-        const paymentPayload = withPaymentIdentifier(
-            signedPayload,
-            typeof paymentId === 'function' ? await paymentId({ requirements }) : paymentId
-        );
+        const paymentPayload = built.paymentPayload;
 
         // Retry the ORIGINAL request with the X-PAYMENT header added.
         const retryInit = {

@@ -132,6 +132,30 @@ const pay = x402PayFunction({ apiKey, walletId, signer });
 const result = await pay.run(JSON.parse(toolCall.arguments));
 ```
 
+### Paying an x402-gated MCP **tool**
+
+`createX402Fetch` pays HTTP endpoints. Agents call **tools** — so a paid MCP tool needs the `/mcp` export:
+
+```js
+import { createX402ToolCaller } from '@cryptoapis-io/x402-buyer-sdk/mcp';
+
+const payToolCall = createX402ToolCaller({ apiKey, walletId, signToPayload });
+
+// Wrap YOUR MCP client's callTool — a challenged tool is paid and retried automatically.
+const result = await payToolCall(
+  (params) => client.callTool(params),
+  { name: 'financial_analysis', arguments: { ticker: 'AAPL' } }
+);
+```
+
+An unpaid call answers with `isError: true` carrying the price; this reads it (preferring
+`structuredContent`, falling back to `content[0].text`), signs locally, and retries **once** with the
+payment in `_meta["x402/payment"]`. The receipt arrives in `_meta["x402/payment-response"]` — read it with
+`readSettlement(result)`.
+
+A result that is not a payment challenge passes through untouched, and a challenge you decline (say
+`allowedNetworks` excludes every option) is returned unpaid so you can see the price and decide.
+
 ### Claude Code, Cursor, Codex & other MCP agents
 
 Use **[`@cryptoapis-io/mcp-x402-pay`](https://www.npmjs.com/package/@cryptoapis-io/mcp-x402-pay)** — an MCP

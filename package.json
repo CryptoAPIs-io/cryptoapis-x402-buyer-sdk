@@ -1,7 +1,7 @@
 {
   "name": "@cryptoapis-io/x402-buyer-sdk",
   "version": "0.3.0",
-  "description": "CryptoAPIs x402 buyer SDK — a fetch wrapper that auto-pays HTTP 402 responses (authorize → sign locally → retry). Non-custodial: you provide the signer; keys never enter the SDK.",
+  "description": "CryptoAPIs x402 buyer SDK \u2014 a fetch wrapper that auto-pays HTTP 402 responses (authorize \u2192 sign locally \u2192 retry). Non-custodial: you provide the signer; keys never enter the SDK.",
   "license": "MIT",
   "author": "Crypto APIs, Inc.",
   "repository": {
@@ -42,6 +42,10 @@
     "./function-calling": {
       "types": "./types/function-calling.d.ts",
       "import": "./src/function-calling.js"
+    },
+    "./mcp": {
+      "types": "./types/mcp.d.ts",
+      "import": "./src/mcp.js"
     }
   },
   "files": [
