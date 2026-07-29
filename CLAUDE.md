@@ -57,3 +57,14 @@ Code-only (built + unit-tested, 28 tests (incl. agent adapters) + a full-envelop
 artifact schemes wired** (EVM/SVM/Tron/UTXO/Kaspa/XRP); EVM is verified end-to-end (SDK → mcp-signer →
 `parseEnvelope` accepts + `eip3009.verifyAuthorization` recovers the buyer). Non-EVM schemes are wired +
 unit-tested but await their signer implementations being exercised live. Agent adapters shipped: `/agent` (neutral), `/ai-sdk`, `/langchain`, `/function-calling` (OpenAI/Anthropic/Gemini); the MCP surface is `@cryptoapis-io/mcp-x402-pay`.
+
+## The standard this implements
+
+- **[x402 v2 specification](https://github.com/coinbase/x402/blob/main/specs/x402-specification-v2.md)** — the normative wire contract: `PaymentRequired` (§5.1),
+  `PaymentPayload` (§5.2), `SettlementResponse` (§5.3), `VerifyResponse` (§5.4), the facilitator
+  interface (§7), the Discovery API (§8) and the standard error codes (§9).
+- **[Transports](https://github.com/coinbase/x402/tree/main/specs/transports-v2)** — `http`, `mcp`, `a2a`: how a resource server and client signal payment
+  over each. The facilitator interface is identical across all of them.
+
+When changing anything on the wire, check it against the spec — a field the spec marks Required is
+not optional for us, and error codes on the wire are the spec's vocabulary, not our internal one.
