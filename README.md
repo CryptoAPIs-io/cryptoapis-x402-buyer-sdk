@@ -188,6 +188,24 @@ const signer = {
 A non-402 response passes through untouched. A 402 you can't/won't pay is returned unchanged. Exactly one
 authorize→sign→retry cycle per request (no loops).
 
+### Safe retries — `paymentId`
+
+If a response never reaches you, you cannot tell whether the payment settled. Retrying blind risks paying
+twice. The [`payment-identifier`](https://github.com/coinbase/x402/blob/main/specs/extensions/payment_identifier.md)
+extension fixes that: you supply an id, and the facilitator uses it as its **dedup key**, so the same id
+settles exactly once no matter how often you retry.
+
+```js
+const pay = createX402Fetch({
+  apiKey, walletId, signer,
+  paymentId: ({ requirements }) => `job_${myJobId}_${requirements.network}`,
+});
+```
+
+Without it the facilitator falls back to the authorization nonce — correct, but *you* cannot address it,
+so you have no safe retry. Ids outside the spec's 16-128 characters are dropped rather than sent: a
+silently-ignored idempotency key is worse than an obviously absent one.
+
 ---
 
 ## Configuration
@@ -198,6 +216,7 @@ authorize→sign→retry cycle per request (no loops).
 | `walletId` | ✓ | the buyer-service **wallet record id** returned by `POST /wallets` (the registry `_id`) — **NOT the on-chain address**. Passing an address gets `wallet_not_found`. |
 | `signer` | ✓ | your local signer (see the table above) — the SDK holds no keys |
 | `allowedNetworks` | | restrict which CAIP-2 networks you'll pay on, e.g. `['eip155:8453']` |
+| `paymentId` | | **idempotency id** (16-128 chars), or a `({requirements}) => id` callback resolved per request — see below |
 | `baseUrl` | | buyer service base URL (default `https://ai.cryptoapis.io/x402/buyer`) |
 | `fetchImpl` | | a custom `fetch` implementation — for a corporate proxy / custom CA (see below) or testing |
 

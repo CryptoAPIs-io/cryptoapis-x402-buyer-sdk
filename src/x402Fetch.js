@@ -27,7 +27,8 @@
 import { createAuthorizeClient } from './authorizeClient.js';
 import { validatePaymentRequirements } from './requirementsValidation.js';
 import {
-    parse402, buildEip712Payload, buildTransactionPayload, encodePaymentHeader
+    parse402, buildEip712Payload, buildTransactionPayload, encodePaymentHeader,
+    withPaymentIdentifier
 } from './paymentPayload.js';
 
 /**
@@ -64,11 +65,15 @@ function selectRequirements(accepts, allowedNetworks) {
  * @param {string} params.walletId the agent wallet id to pay from
  * @param {Object} params.signer the local signer — `{ signTypedData({domain,types,primaryType,message}): Promise<string> }` for EVM
  * @param {Array<string>} [params.allowedNetworks] restrict which CAIP-2 networks the wallet will pay on
+ * @param {(string|Function)} [params.paymentId] `payment-identifier` extension — an idempotency id
+ *   (16-128 chars), or a `({requirements}) => id` callback resolved per request. The facilitator uses
+ *   it as the dedup key, so retrying a request whose response you never saw settles ONCE. Omitted, the
+ *   facilitator falls back to the authorization nonce, which you cannot address.
  * @param {string} [params.baseUrl] buyer service base URL override (QA/local)
  * @param {Function} [params.fetchImpl] fetch implementation (default global fetch; injectable for tests)
  * @return {Function} an `x402Fetch(url, init)` compatible with fetch
  */
-function createX402Fetch({ apiKey, walletId, signer, allowedNetworks, baseUrl, fetchImpl } = {}) {
+function createX402Fetch({ apiKey, walletId, signer, allowedNetworks, paymentId, baseUrl, fetchImpl } = {}) {
     if (!walletId) {
         throw new Error('createX402Fetch: walletId is required');
     }
@@ -213,11 +218,19 @@ function createX402Fetch({ apiKey, walletId, signer, allowedNetworks, baseUrl, f
             paymentRequirements: requirements,
             walletId: walletId,
         });
-        const paymentPayload = await signToPayload({
+        const signedPayload = await signToPayload({
             scheme,
             signing,
             requirements
         });
+        // `payment-identifier` (x402 extension): when the caller supplies an id it becomes
+        // the facilitator's idempotency key, so a retry of a request whose response never
+        // arrived settles once rather than twice. Resolved per-request so a caller can key
+        // it to their own job/request id.
+        const paymentPayload = withPaymentIdentifier(
+            signedPayload,
+            typeof paymentId === 'function' ? await paymentId({ requirements }) : paymentId
+        );
 
         // Retry the ORIGINAL request with the X-PAYMENT header added.
         const retryInit = {

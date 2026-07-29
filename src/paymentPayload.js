@@ -33,6 +33,41 @@ function parse402(body) {
 }
 
 /**
+ * Attach the `payment-identifier` extension to a PaymentPayload.
+ *
+ * The id becomes the facilitator's idempotency key, so the CALLER controls dedup: a retry
+ * of a request whose response never arrived settles once, not twice. Without an id the
+ * facilitator falls back to the authorization nonce — correct, but not caller-addressable.
+ *
+ * The spec bounds the id to 16-128 characters; an out-of-bounds value is dropped here
+ * rather than sent, since the facilitator would ignore it anyway and a silently-ignored
+ * idempotency key is worse than an obviously absent one.
+ *
+ * @param {Object} payload a PaymentPayload
+ * @param {string} [paymentId] the caller's idempotency id
+ * @return {Object} the payload, with the extension when the id is usable
+ */
+function withPaymentIdentifier(payload, paymentId) {
+    if (typeof paymentId !== 'string' || paymentId.length < 16 || paymentId.length > 128) {
+        return payload;
+    }
+    return {
+        ...payload,
+        extensions: {
+            ...(payload.extensions ?? {}),
+            'payment-identifier': { info: { id: paymentId } },
+        },
+    };
+}
+
+/**
+ *
+ * @param param
+ * @param param.network
+ * @param param.authorization
+ * @param param.signature
+ */
+/**
  * Build the EVM (`eip712`) PaymentPayload from the signed EIP-3009 authorization.
  *
  * @param {Object} params inputs
@@ -89,6 +124,7 @@ function encodePaymentHeader(paymentPayload) {
 }
 
 export {
+    withPaymentIdentifier,
     parse402,
     buildEip712Payload,
     buildTransactionPayload,
