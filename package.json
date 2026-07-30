@@ -1,6 +1,6 @@
 {
   "name": "@cryptoapis-io/x402-buyer-sdk",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "CryptoAPIs x402 buyer SDK — a fetch wrapper that auto-pays HTTP 402 responses (authorize → sign locally → retry). Non-custodial: you provide the signer; keys never enter the SDK.",
   "license": "MIT",
   "author": "Crypto APIs, Inc.",
