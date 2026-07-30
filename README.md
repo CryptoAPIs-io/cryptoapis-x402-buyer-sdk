@@ -164,6 +164,44 @@ out of the box.
 
 ---
 
+## Beyond HTTP — paying MCP tools and A2A agents
+
+x402 defines three transports and this SDK covers all of them. The payment flow is identical
+(authorize → sign locally → retry); only the envelope changes.
+
+**MCP — pay another server's tool:**
+
+```js
+import { createX402ToolCaller } from '@cryptoapis-io/x402-buyer-sdk/mcp';
+
+const payToolCall = createX402ToolCaller({ apiKey, walletId, signToPayload });
+const result = await payToolCall(client.callTool.bind(client), {
+  name: 'premium_data',
+  arguments: { query: 'gold' },
+});
+```
+
+A challenge arrives as a tool result with `isError: true`; the payment goes back as a raw object in
+`_meta["x402/payment"]`, and the receipt comes back in `_meta["x402/payment-response"]`.
+
+**A2A — pay another agent:**
+
+```js
+import { createX402TaskSender, readReceipts } from '@cryptoapis-io/x402-buyer-sdk/a2a';
+
+const payTask = createX402TaskSender({ apiKey, walletId, signToPayload });
+const task = await payTask(a2aClient.sendMessage, { message });
+const receipts = readReceipts(task);
+```
+
+A2A is task-based: a challenge is a task in `input-required` carrying the price under
+`x402.payment.required`, and the payment goes back in a **new message** correlated by `taskId`.
+
+Both retry exactly once. A second challenge means the payment was rejected — retrying again would risk
+paying twice.
+
+---
+
 ## Non-custodial signing — the `signer` contract
 
 The SDK **never holds a key.** You pass a `signer` that signs locally (in your process, KMS, hardware
