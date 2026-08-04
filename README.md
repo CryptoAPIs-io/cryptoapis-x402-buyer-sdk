@@ -250,6 +250,19 @@ const signer = {
 A non-402 response passes through untouched. A 402 you can't/won't pay is returned unchanged. Exactly one
 authorize→sign→retry cycle per request (no loops).
 
+### Solana — paying a merchant who has never held the token
+
+On Solana a recipient needs an **associated token account (ATA)** for the mint before it can
+receive an SPL token. Paying a merchant who has never held that token would otherwise fail.
+
+`/authorize` handles it: when the destination ATA is missing, the transaction it returns
+carries an idempotent create-ATA instruction alongside the transfer, and the **facilitator
+pays the rent** as the transaction's fee payer. Nothing changes for you — you sign the
+transaction you are given, exactly as always. When the ATA already exists you get the same
+single-instruction transfer as before.
+
+This is why you can pay a brand-new merchant address without them setting anything up first.
+
 ### Safe retries — `paymentId`
 
 If a response never reaches you, you cannot tell whether the payment settled. Retrying blind risks paying
