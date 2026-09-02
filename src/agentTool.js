@@ -60,7 +60,9 @@ function createPayTool(config) {
             ...(body != null ? { body } : {})
         };
         const res = await fetch402(url, init);
-        const settlementHeader = res.headers?.get?.('x-payment-response');
+        // v2 merchants return the receipt on PAYMENT-RESPONSE, v1 on X-PAYMENT-RESPONSE.
+        const settlementHeader = res.headers?.get?.('payment-response') ??
+            res.headers?.get?.('x-payment-response');
         return {
             status: res.status,
             paid: Boolean(settlementHeader),

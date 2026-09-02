@@ -237,18 +237,37 @@ const signer = {
 
 ```
   your fetch/agent ──▶  GET /premium
-                         └─ 402 { accepts: [PaymentRequirements] }
+                         └─ 402  PAYMENT-REQUIRED: <base64 challenge>
+                                 (or the v1 body { accepts: [...] })
         ┌────────────────────────────────────────────────────────┐
         │ 1. pick an acceptable option (allowedNetworks-aware)     │
         │ 2. POST buyer /authorize  →  { scheme, signing }         │
         │ 3. signer.signX(signing)  ←  YOUR key, local only        │
-        │ 4. build X-PAYMENT header (base64 PaymentPayload)        │
+        │ 4. build the base64 PaymentPayload credential            │
         └────────────────────────────────────────────────────────┘
-                     ──▶  GET /premium  (X-PAYMENT: …)  →  200 + resource
+                     ──▶  GET /premium  (PAYMENT-SIGNATURE + X-PAYMENT)
+                          →  200 + resource + PAYMENT-RESPONSE receipt
 ```
 
 A non-402 response passes through untouched. A 402 you can't/won't pay is returned unchanged. Exactly one
 authorize→sign→retry cycle per request (no loops).
+
+### Transport versions
+
+x402 v2 carries the challenge, the credential and the receipt in HTTP headers
+(`PAYMENT-REQUIRED`, `PAYMENT-SIGNATURE`, `PAYMENT-RESPONSE`) and treats the response body as a
+server implementation concern; v1 put the challenge in the 402 body and the credential in
+`X-PAYMENT`. This client speaks **both**, so it can pay a merchant written to either:
+
+- the challenge is read from `PAYMENT-REQUIRED` first, falling back to the body — a v2 merchant may
+  send no body at all, and one that sends both is taken at its header
+- the credential goes out on `PAYMENT-SIGNATURE` **and** `X-PAYMENT` (same value); each merchant
+  reads the one it knows
+- the receipt is read from `PAYMENT-RESPONSE`, falling back to `X-PAYMENT-RESPONSE`
+
+The `PaymentPayload` carries the chosen requirement as `accepted` (Required, v2 §5.2.2) **and**
+keeps top-level `scheme`/`network`, so a merchant matching on either shape pairs the payment with
+the right requirement.
 
 ### Solana — paying a merchant who has never held the token
 
