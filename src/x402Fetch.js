@@ -5,7 +5,13 @@
  *   1. parse the merchant's `accepts` (PaymentRequirements list) and pick one
  *   2. POST it to the CryptoAPIs buyer `/authorize` → `{ scheme, signing }`
  *   3. **sign LOCALLY** via the caller-provided `signer` (keys never enter the SDK)
- *   4. build the `PaymentPayload` + base64 `X-PAYMENT` header and RETRY the request once
+ *   4. build the `PaymentPayload` + base64 credential header and RETRY the request once
+ *
+ * TRANSPORT: x402 v2 carries the challenge in a `PAYMENT-REQUIRED` response header, the
+ * credential in `PAYMENT-SIGNATURE`, and the receipt in `PAYMENT-RESPONSE`; v1 put the
+ * challenge in the 402 body and the credential in `X-PAYMENT`. This client speaks BOTH —
+ * it reads the header challenge and falls back to the body, and sends the credential on
+ * both request headers — so it can pay a merchant written to either.
  *
  * NON-CUSTODIAL: the SDK never holds a key. The caller passes a `signer` implementing
  * only the scheme(s) it wants to support. Each maps 1:1 to a `@cryptoapis-io/mcp-signer`
@@ -29,7 +35,7 @@ import {
     buildPaymentForChallenge, selectRequirements
 } from './payFlow.js';
 import {
-    parse402, buildEip712Payload, buildTransactionPayload, encodePaymentHeader
+    readChallenge, buildEip712Payload, buildTransactionPayload, encodePaymentHeader
 } from './paymentPayload.js';
 
 /**
@@ -100,6 +106,7 @@ function createX402Fetch({ apiKey, walletId, signer, allowedNetworks, paymentId,
                 network: network,
                 authorization: signing.message,
                 signature: signature,
+                requirements: requirements,
             });
         }
 
@@ -111,7 +118,8 @@ function createX402Fetch({ apiKey, walletId, signer, allowedNetworks, paymentId,
             const transaction = await signer.signSvm({ transaction: signing.transaction });
             return buildTransactionPayload({
                 network,
-                transaction
+                transaction,
+                requirements
             });
         }
         if (scheme === 'tron-transaction') {
@@ -120,7 +128,8 @@ function createX402Fetch({ apiKey, walletId, signer, allowedNetworks, paymentId,
             const transaction = await signer.signTron({ transaction: signing.transaction });
             return buildTransactionPayload({
                 network,
-                transaction
+                transaction,
+                requirements
             });
         }
         if (scheme === 'utxo-transaction') {
@@ -132,7 +141,8 @@ function createX402Fetch({ apiKey, walletId, signer, allowedNetworks, paymentId,
             });
             return buildTransactionPayload({
                 network,
-                transaction
+                transaction,
+                requirements
             });
         }
         if (scheme === 'kaspa-transaction') {
@@ -141,7 +151,8 @@ function createX402Fetch({ apiKey, walletId, signer, allowedNetworks, paymentId,
             const transaction = await signer.signKaspa({ preparedTransaction: signing.preparedTransaction });
             return buildTransactionPayload({
                 network,
-                transaction
+                transaction,
+                requirements
             });
         }
         if (scheme === 'xrp-transaction') {
@@ -150,7 +161,8 @@ function createX402Fetch({ apiKey, walletId, signer, allowedNetworks, paymentId,
             const transaction = await signer.signXrp({ transaction: signing.transaction });
             return buildTransactionPayload({
                 network,
-                transaction
+                transaction,
+                requirements
             });
         }
 
@@ -184,12 +196,18 @@ function createX402Fetch({ apiKey, walletId, signer, allowedNetworks, paymentId,
             return first;
         }
 
+        // v2 merchants put the challenge in the PAYMENT-REQUIRED header and need not send
+        // a body at all; v1 merchants put it in the body. Read the header first.
         const body = await first.clone().json().catch(() => null);
+        const accepts = readChallenge({
+            headerValue: first.headers?.get?.('payment-required'),
+            body: body,
+        });
         // Shared with the MCP transport: select -> validate -> authorize -> sign -> attach
         // the payment-identifier. Only the envelope differs between transports, so both run
         // ONE implementation and a fix can never land on just one of them.
         const built = await buildPaymentForChallenge({
-            accepts: parse402(body),
+            accepts: accepts,
             allowedNetworks: allowedNetworks,
             authorizeClient: authorizeClient,
             walletId: walletId,
@@ -202,12 +220,16 @@ function createX402Fetch({ apiKey, walletId, signer, allowedNetworks, paymentId,
         }
         const paymentPayload = built.paymentPayload;
 
-        // Retry the ORIGINAL request with the X-PAYMENT header added.
+        // Retry the ORIGINAL request with the credential attached. Both header names carry
+        // the SAME value: `payment-signature` for a v2 merchant, `x-payment` for a v1 one.
+        // A merchant reads whichever it knows and ignores the other.
+        const credential = encodePaymentHeader(paymentPayload);
         const retryInit = {
             ...init,
             headers: {
                 ...(init.headers ?? {}),
-                'x-payment': encodePaymentHeader(paymentPayload),
+                'payment-signature': credential,
+                'x-payment': credential,
             },
         };
         return doFetch(url, retryInit);
