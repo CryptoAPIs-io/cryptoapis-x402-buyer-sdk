@@ -174,6 +174,7 @@ function createX402TaskSender({
             walletId: walletId,
             signToPayload: signToPayload,
             paymentId: paymentId,
+            resource: challenge.resource,
         });
         if (!built) {
             // Nothing offered is acceptable — return the challenge so the caller sees the price.

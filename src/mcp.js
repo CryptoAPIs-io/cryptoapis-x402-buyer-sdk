@@ -131,6 +131,7 @@ function createX402ToolCaller({
             walletId: walletId,
             signToPayload: signToPayload,
             paymentId: paymentId,
+            resource: challenge.resource,
         });
         if (!built) {
             // Nothing offered is acceptable (e.g. allowedNetworks excludes them all) —

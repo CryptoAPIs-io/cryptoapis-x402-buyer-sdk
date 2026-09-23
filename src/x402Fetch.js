@@ -213,6 +213,9 @@ function createX402Fetch({ apiKey, walletId, signer, allowedNetworks, paymentId,
             walletId: walletId,
             signToPayload: signToPayload,
             paymentId: paymentId,
+            // The URL we actually fetched — not the merchant's self-declared resource — so the
+            // wallet's domain allowlist guards the host that is really being paid.
+            resource: typeof url === 'object' && 'url' in url ? url.url : String(url),
         });
         if (!built) {
             // Nothing we can/will pay — hand the 402 back to the caller unchanged.
