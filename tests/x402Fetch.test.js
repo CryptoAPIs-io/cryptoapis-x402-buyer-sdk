@@ -401,3 +401,72 @@ test('selectRequirements honors the allowedNetworks allowlist', () => {
     assert.equal(selectRequirements([evm], ['solana:x']), null); // none acceptable
     assert.equal(selectRequirements([]), null);
 });
+
+test('forwards the requested URL to /authorize as `resource` (x402 v2 domain allowlist)', async () => {
+    let authorizeBody;
+    const fetchImpl = async (url, init) => {
+        if (String(url).endsWith('/authorize')) {
+            authorizeBody = JSON.parse(init.body);
+            return resp({
+                status: 200,
+                body: authorizeResponse
+            });
+        }
+        return init.headers?.['x-payment']
+            ? resp({ status: 200 })
+            : resp({
+                status: 402,
+                body: {
+                    x402Version: 2,
+                    resource: { url: 'https://declared.example/other' },
+                    accepts: [reqs]
+                }
+            });
+    };
+    const f = createX402Fetch({
+        apiKey: 'K',
+        walletId: 'w1',
+        signer: { signTypedData: async () => '0xsig' },
+        fetchImpl
+    });
+
+    await f('https://api.example.com/premium?q=1');
+    // the URL actually fetched — not the merchant-declared resource — is what gets checked
+    assert.equal(authorizeBody.resource, 'https://api.example.com/premium?q=1');
+
+    await f(new URL('https://api.example.com/as-url'));
+    assert.equal(authorizeBody.resource, 'https://api.example.com/as-url');
+});
+
+test('a refused /authorize ({authorized:false}) throws with the service reason, never signs', async () => {
+    let signed = false;
+    const fetchImpl = async (url) => (String(url).endsWith('/authorize')
+        ? resp({
+            status: 200,
+            body: {
+                authorized: false,
+                reason: 'domain_not_allowed'
+            }
+        })
+        : resp({
+            status: 402,
+            body: {
+                x402Version: 2,
+                accepts: [reqs]
+            }
+        }));
+    const f = createX402Fetch({
+        apiKey: 'K',
+        walletId: 'w1',
+        signer: { signTypedData: async () => { signed = true; return '0xsig'; } },
+        fetchImpl
+    });
+
+    await assert.rejects(f('https://api/premium'), (err) => {
+        assert.equal(err.code, 'authorize_refused');
+        assert.equal(err.reason, 'domain_not_allowed');
+        assert.match(err.message, /buyer \/authorize refused: domain_not_allowed/);
+        return true;
+    });
+    assert.equal(signed, false);
+});

@@ -33,10 +33,16 @@ function createAuthorizeClient({ apiKey, baseUrl = DEFAULT_BASE_URL, fetchImpl }
          * @param {Object} params inputs
          * @param {Object} params.paymentRequirements the merchant's PaymentRequirements (from the 402)
          * @param {string} params.walletId the agent wallet id to pay from
+         * @param {(string|Object)} [params.resource] the resource being paid for — the URL the
+         *   client requested (or a v2 `{url}` ResourceInfo). x402 v2 carries NO resource inside
+         *   PaymentRequirements, so without it the service cannot check the wallet's
+         *   `allowedDomains` and refuses `domain_not_allowed`.
          * @return {Promise<{scheme: string, signing: Object}>} the wire scheme + signing artifact
-         * @throws {Error} on a non-2xx (transport/auth/budget) response
+         * @throws {Error} on a non-2xx (transport/auth) response, or when the service refuses the
+         *   payment (`{authorized:false}` — budget, allowlist, wallet); the refusal carries
+         *   `code: 'authorize_refused'` and the service's `reason`
          */
-        async authorize({ paymentRequirements, walletId }) {
+        async authorize({ paymentRequirements, walletId, resource }) {
             const res = await doFetch(`${root}/authorize`, {
                 method: 'POST',
                 headers: {
@@ -45,7 +51,8 @@ function createAuthorizeClient({ apiKey, baseUrl = DEFAULT_BASE_URL, fetchImpl }
                 },
                 body: JSON.stringify({
                     paymentRequirements: paymentRequirements,
-                    walletId: walletId
+                    walletId: walletId,
+                    ...(resource ? { resource: resource } : {}),
                 }),
             });
             if (!res.ok) {
@@ -53,6 +60,15 @@ function createAuthorizeClient({ apiKey, baseUrl = DEFAULT_BASE_URL, fetchImpl }
                 throw new Error(`buyer /authorize failed: ${res.status} ${text}`.trim());
             }
             const body = await res.json();
+            // A policy refusal is a 200 `{authorized:false, reason}`, not a non-2xx. Surface it
+            // as-is: carrying on would hand the signer an undefined scheme and bury the real
+            // reason under a misleading "family not supported" error.
+            if (body?.authorized === false) {
+                const refusal = new Error(`buyer /authorize refused: ${body.reason ?? 'unknown'}`);
+                refusal.code = 'authorize_refused';
+                refusal.reason = body.reason;
+                throw refusal;
+            }
             // The buyer service returns the artifact-to-sign as `signingPayload`; expose it to the
             // rest of the SDK under the internal `signing` name (older builds used `signing`, so we
             // accept either for forward/backward resilience). See buyer authorizeService.

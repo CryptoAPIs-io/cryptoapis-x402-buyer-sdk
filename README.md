@@ -88,6 +88,11 @@ const data = await res.json();
 
 That's it. No manual 402 handling, no header juggling.
 
+If the buyer service **refuses** the payment (over a budget limit, a network or domain outside the wallet's
+allowlist, unknown wallet), `fetch402` throws an error with `code: 'authorize_refused'` and the service's
+`reason` (e.g. `per_tx_limit_exceeded`, `domain_not_allowed`) — nothing is signed. The wallet's
+`allowedDomains` is checked against the host of the URL you fetched.
+
 ---
 
 ## Give an AI agent the ability to pay

@@ -26,7 +26,7 @@ holds NO keys and signs NOTHING** — the caller passes a `signer`; signing happ
 requirements↔payload are paired by **network**, never scheme.
 
 ## Modules (`src/`)
-- `authorizeClient.js` — `createAuthorizeClient({apiKey, baseUrl, fetchImpl})` → `authorize({paymentRequirements, walletId})`. Buyer service at `ai.cryptoapis.io/x402/buyer/*`, `x-api-key` (X402_BUYER). Non-2xx throws (budget/auth).
+- `authorizeClient.js` — `createAuthorizeClient({apiKey, baseUrl, fetchImpl})` → `authorize({paymentRequirements, walletId})`. Buyer service at `ai.cryptoapis.io/x402/buyer/*`, `x-api-key` (X402_BUYER). Sends `resource` (the URL actually fetched; MCP/A2A: the challenge's ResourceInfo) — x402 v2 has no resource in PaymentRequirements, and the service's `allowedDomains` check needs it. Non-2xx throws (transport/auth); a policy refusal is a **200 `{authorized:false, reason}`** and also throws (`code:'authorize_refused'`, `.reason`) — never fall through to signing.
 - `paymentPayload.js` — `parse402` (accepts list), `buildEip712Payload` (the `{x402Version, scheme, network, payload:{signature, authorization}}` wire shape), `encodePaymentHeader` (base64).
 - `x402Fetch.js` — the orchestrator + `selectRequirements` (allowlist-aware pick).
 - `index.js` — barrel.

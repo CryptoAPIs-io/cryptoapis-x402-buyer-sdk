@@ -42,11 +42,13 @@ function selectRequirements(accepts, allowedNetworks) {
  * @param {Function} params.signToPayload `({scheme, signing, requirements}) => PaymentPayload`
  * @param {(string|Function)} [params.paymentId] `payment-identifier` id, or a
  *   `({requirements}) => id` callback resolved per request
+ * @param {(string|Object)} [params.resource] the resource being paid for (URL or v2
+ *   ResourceInfo) — forwarded to /authorize for the wallet's domain allowlist
  * @return {Promise<{paymentPayload: Object, requirements: Object}|null>} the payload to
  *   resubmit plus the requirement it pays, or null when nothing offered is acceptable
  */
 async function buildPaymentForChallenge({
-    accepts, allowedNetworks, authorizeClient, walletId, signToPayload, paymentId,
+    accepts, allowedNetworks, authorizeClient, walletId, signToPayload, paymentId, resource,
 }) {
     const requirements = selectRequirements(accepts, allowedNetworks);
     if (!requirements) {
@@ -62,6 +64,7 @@ async function buildPaymentForChallenge({
     const { scheme, signing } = await authorizeClient.authorize({
         paymentRequirements: requirements,
         walletId: walletId,
+        resource: resource,
     });
     const signedPayload = await signToPayload({
         scheme,
